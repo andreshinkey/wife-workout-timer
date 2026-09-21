@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Workout Timer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* Color transitions for seamless theme shifts */
+        .theme-transition {
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* WORK State Theme (Vibrant Green) */
+        .state-work {
+            background-color: #10B981; /* Emerald 500 */
+            color: #064E3B; /* Emerald 950 */
+        }
+        .state-work .card-bg {
+            background-color: rgba(6, 78, 59, 0.12);
+            border-color: rgba(6, 78, 59, 0.2);
+        }
+        .state-work .btn-primary {
+            background-color: #064E3B;
+            color: #10B981;
+        }
+        .state-work .btn-secondary {
+            background-color: rgba(6, 78, 59, 0.2);
+            color: #064E3B;
+        }
+
+        /* REST State Theme (High-Contrast Amber/Yellow) */
+        .state-rest {
+            background-color: #FBBF24; /* Amber 400 */
+            color: #451A03; /* Amber 950 */
+        }
+        .state-rest .card-bg {
+            background-color: rgba(69, 26, 3, 0.12);
+            border-color: rgba(69, 26, 3, 0.2);
+        }
+        .state-rest .btn-primary {
+            background-color: #451A03;
+            color: #FBBF24;
+        }
+        .state-rest .btn-secondary {
+            background-color: rgba(69, 26, 3, 0.2);
+            color: #451A03;
+        }
+
+        /* PREP / READY State (Neutral Dark Slate) */
+        .state-prep {
+            background-color: #0F172A; /* Slate 900 */
+            color: #F8FAFC; /* Slate 50 */
+        }
+        .state-prep .card-bg {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .state-prep .btn-primary {
+            background-color: #10B981;
+            color: #0F172A;
+        }
+        .state-prep .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #F8FAFC;
+        }
+
+        /* FINISHED State (Vibrant Violet) */
+        .state-finished {
+            background-color: #8B5CF6; /* Purple 500 */
+            color: #2E1065;
+        }
+        .state-finished .card-bg {
+            background-color: rgba(46, 16, 101, 0.15);
+            border-color: rgba(46, 16, 101, 0.25);
+        }
+        .state-finished .btn-primary {
+            background-color: #2E1065;
+            color: #8B5CF6;
+        }
+        .state-finished .btn-secondary {
+            background-color: rgba(46, 16, 101, 0.2);
+            color: #2E1065;
+        }
+
+        /* Pulse animation for active countdown text */
+        @keyframes subtle-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .pulse-active {
+            animation: subtle-pulse 1s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="theme-transition state-prep h-screen w-screen overflow-hidden flex flex-col justify-between p-4 sm:p-6 md:p-8">
+
+    <!-- Top Header & Progress Section -->
+    <header class="w-full max-w-2xl mx-auto flex flex-col gap-2">
+        <div class="flex justify-between items-center px-1">
+            <span id="workout-title" class="text-sm sm:text-base font-bold tracking-wider uppercase opacity-80">
+                13 Exercise Circuit
+            </span>
+            <span id="wake-lock-status" class="text-xs font-semibold px-2.5 py-1 rounded-full card-bg flex items-center gap-1.5 opacity-90">
+                <i class="fa-solid fa-lock text-xs"></i> Screen Awake
+            </span>
+        </div>
+
+        <!-- Overall Progress Bar Container -->
+        <div class="w-full bg-black/10 rounded-full h-3 sm:h-4 overflow-hidden p-0.5 border border-black/10">
+            <div id="overall-progress-bar" class="h-full bg-current rounded-full transition-all duration-300 w-0"></div>
+        </div>
+
+        <!-- Counter Indicator -->
+        <div class="flex justify-between items-center px-1 text-xs sm:text-sm font-black tracking-wide uppercase opacity-90">
+            <span id="exercise-step-indicator">Get Ready</span>
+            <span id="total-time-remaining">Total: 13:00</span>
+        </div>
+    </header>
+
+    <!-- Main Center Timer Card -->
+    <main class="flex-1 my-auto flex flex-col justify-center items-center text-center max-w-3xl mx-auto w-full py-2">
+        
+        <!-- Status Badge -->
+        <div id="status-badge" class="inline-block px-6 py-2 rounded-full font-black text-lg sm:text-2xl md:text-3xl tracking-widest uppercase mb-2 card-bg transition-transform duration-200">
+            GET READY
+        </div>
+
+        <!-- Main Display Exercise Name / Next Exercise -->
+        <div class="min-h-[110px] sm:min-h-[140px] flex flex-col justify-center items-center px-2">
+            <h2 id="sub-label" class="text-xs sm:text-base font-bold tracking-widest uppercase opacity-80 mb-1 hidden">
+                UP NEXT
+            </h2>
+            <h1 id="exercise-name" class="text-2xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tight uppercase max-w-2xl">
+                Press Start to Begin
+            </h1>
+        </div>
+
+        <!-- Massive Countdown Display -->
+        <div class="my-2 sm:my-4">
+            <span id="timer-display" class="font-black text-7xl sm:text-8xl md:text-9xl tracking-tighter leading-none block font-mono">
+                00:20
+            </span>
+        </div>
+
+        <!-- Subtext / Next Up preview when in WORK state -->
+        <div id="next-up-container" class="h-8 text-sm sm:text-lg font-bold opacity-80 tracking-wide">
+            <span id="next-up-label">Next: </span><span id="next-up-name" class="font-black">Squat and calf raise</span>
+        </div>
+    </main>
+
+    <!-- Bottom Control Bar -->
+    <footer class="w-full max-w-xl mx-auto">
+        <div class="flex items-center justify-center gap-3 sm:gap-6">
+            
+            <!-- Restart Button -->
+            <button id="btn-restart" title="Restart Workout" class="btn-secondary w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold transition-all transform active:scale-95 shadow-md">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+
+            <!-- Previous Exercise Button -->
+            <button id="btn-prev" title="Previous Exercise" class="btn-secondary w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold transition-all transform active:scale-95 shadow-md">
+                <i class="fa-solid fa-backward"></i>
+            </button>
+
+            <!-- Main Play / Pause Button -->
+            <button id="btn-play-pause" title="Play / Pause" class="btn-primary w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center text-3xl sm:text-4xl font-extrabold transition-all transform active:scale-95 shadow-lg">
+                <i id="play-icon" class="fa-solid fa-play ml-1"></i>
+            </button>
+
+            <!-- Next Exercise Button -->
+            <button id="btn-next" title="Next Exercise" class="btn-secondary w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold transition-all transform active:scale-95 shadow-md">
+                <i class="fa-solid fa-forward"></i>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Invisible video trick to enforce wake lock across browsers -->
+    <video id="wake-lock-video" loop muted playsinline class="hidden" src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAAAAG1kYXQ="></video>
+
+    <script>
+        // Exercise Sequence Configuration
+        const WORKOUT_CONFIG = {
+            prepDuration: 20,
+            workDuration: 40,
+            restDuration: 20,
+            exercises: [
+                "Squat and calf raise",
+                "Reverse lunge",
+                "Lat lunge",
+                "Skater lunge",
+                "Push ups",
+                "Plank shoulder taps",
+                "Tricep dips",
+                "Bear crawl",
+                "Mnt climbers",
+                "Squat knee drive",
+                "Burpee",
+                "Side plank knee to elbow (Left)",
+                "Side plank knee to elbow (Right)"
+            ]
+        };
+
+        // State Enums
+        const STATE = {
+            PREP: 'PREP',
+            WORK: 'WORK',
+            REST: 'REST',
+            FINISHED: 'FINISHED'
+        };
+
+        // App State Variables
+        let currentState = STATE.PREP;
+        let currentExerciseIndex = 0; // 0 to 12
+        let timeRemaining = WORKOUT_CONFIG.prepDuration;
+        let isRunning = false;
+        let timerInterval = null;
+        let wakeLock = null;
+
+        // DOM Elements
+        const bodyEl = document.body;
+        const statusBadge = document.getElementById('status-badge');
+        const exerciseNameEl = document.getElementById('exercise-name');
+        const subLabelEl = document.getElementById('sub-label');
+        const timerDisplay = document.getElementById('timer-display');
+        const nextUpContainer = document.getElementById('next-up-container');
+        const nextUpNameEl = document.getElementById('next-up-name');
+        const stepIndicator = document.getElementById('exercise-step-indicator');
+        const totalTimeRemainingEl = document.getElementById('total-time-remaining');
+        const overallProgressBar = document.getElementById('overall-progress-bar');
+        
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const playIcon = document.getElementById('play-icon');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const btnRestart = document.getElementById('btn-restart');
+        const wakeLockStatus = document.getElementById('wake-lock-status');
+
+        // Screen Wake Lock Handler to keep device screen awake during workout
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLockStatus.classList.remove('opacity-40');
+                } else {
+                    // Fallback to video loop
+                    const video = document.getElementById('wake-lock-video');
+                    if (video) video.play().catch(() => {});
+                }
+            } catch (err) {
+                console.log('Wake Lock request failed:', err);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release().then(() => { wakeLock = null; });
+            }
+        }
+
+        // Re-acquire lock if tab loses focus and returns
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isRunning) {
+                requestWakeLock();
+            }
+        });
+
+        // Format seconds into MM:SS
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Calculate total workout duration remaining in seconds
+        function calculateTotalSecondsRemaining() {
+            if (currentState === STATE.FINISHED) return 0;
+            
+            const totalExercises = WORKOUT_CONFIG.exercises.length;
+            const remainingExercises = totalExercises - (currentExerciseIndex + 1);
+            
+            // Time remaining in current block
+            let total = timeRemaining;
+
+            if (currentState === STATE.PREP) {
+                // Remaining prep time + all work + all rest
+                total += totalExercises * WORKOUT_CONFIG.workDuration + (totalExercises - 1) * WORKOUT_CONFIG.restDuration;
+            } else if (currentState === STATE.WORK) {
+                // Remaining work + remaining full rest + remaining future work & rest blocks
+                total += WORKOUT_CONFIG.restDuration; // Rest after this work
+                total += remainingExercises * (WORKOUT_CONFIG.workDuration + WORKOUT_CONFIG.restDuration);
+            } else if (currentState === STATE.REST) {
+                // Remaining rest + remaining future work & rest blocks
+                total += remainingExercises * (WORKOUT_CONFIG.workDuration + WORKOUT_CONFIG.restDuration);
+            }
+
+            return Math.max(0, total);
+        }
+
+        // Total static workout time (20s prep + 13*40s work + 12*20s rest = 780s / 13 mins)
+        const TOTAL_WORKOUT_SECONDS = WORKOUT_CONFIG.prepDuration + 
+            (WORKOUT_CONFIG.exercises.length * WORKOUT_CONFIG.workDuration) + 
+            ((WORKOUT_CONFIG.exercises.length - 1) * WORKOUT_CONFIG.restDuration);
+
+        // Update UI components based on current state
+        function updateUI() {
+            // Update time display
+            timerDisplay.textContent = formatTime(timeRemaining);
+            
+            // Update total time left display
+            const totalRemaining = calculateTotalSecondsRemaining();
+            totalTimeRemainingEl.textContent = `Total: ${formatTime(totalRemaining)}`;
+
+            // Update Progress Bar
+            const elapsedSeconds = TOTAL_WORKOUT_SECONDS - totalRemaining;
+            const progressPercent = Math.min(100, Math.max(0, (elapsedSeconds / TOTAL_WORKOUT_SECONDS) * 100));
+            overallProgressBar.style.width = `${progressPercent}%`;
+
+            // Reset Body Theme Classes
+            bodyEl.className = "theme-transition h-screen w-screen overflow-hidden flex flex-col justify-between p-4 sm:p-6 md:p-8 ";
+
+            const currentExName = WORKOUT_CONFIG.exercises[currentExerciseIndex];
+            const nextExName = WORKOUT_CONFIG.exercises[currentExerciseIndex + 1];
+
+            switch (currentState) {
+                case STATE.PREP:
+                    bodyEl.classList.add('state-prep');
+                    statusBadge.textContent = "INITIAL REST / PREP";
+                    subLabelEl.classList.add('hidden');
+                    exerciseNameEl.textContent = "Get Ready!";
+                    nextUpContainer.classList.remove('hidden');
+                    nextUpNameEl.textContent = WORKOUT_CONFIG.exercises[0];
+                    stepIndicator.textContent = `Preparing (1 of ${WORKOUT_CONFIG.exercises.length})`;
+                    break;
+
+                case STATE.WORK:
+                    bodyEl.classList.add('state-work');
+                    statusBadge.textContent = "WORK";
+                    subLabelEl.classList.add('hidden');
+                    exerciseNameEl.textContent = currentExName;
+                    
+                    if (nextExName) {
+                        nextUpContainer.classList.remove('hidden');
+                        nextUpNameEl.textContent = nextExName;
+                    } else {
+                        nextUpContainer.classList.add('hidden');
+                    }
+                    stepIndicator.textContent = `Exercise ${currentExerciseIndex + 1} of ${WORKOUT_CONFIG.exercises.length}`;
+                    break;
+
+                case STATE.REST:
+                    bodyEl.classList.add('state-rest');
+                    statusBadge.textContent = "REST";
+                    subLabelEl.classList.remove('hidden');
+                    subLabelEl.textContent = "UP NEXT";
+                    // Display next exercise name large during rest interval as requested
+                    exerciseNameEl.textContent = nextExName || "Final Stretch!";
+                    nextUpContainer.classList.add('hidden');
+                    stepIndicator.textContent = `Resting (${currentExerciseIndex + 1} of ${WORKOUT_CONFIG.exercises.length})`;
+                    break;
+
+                case STATE.FINISHED:
+                    bodyEl.classList.add('state-finished');
+                    statusBadge.textContent = "WORKOUT COMPLETE!";
+                    subLabelEl.classList.add('hidden');
+                    exerciseNameEl.textContent = "Great Job! 🎉";
+                    nextUpContainer.classList.add('hidden');
+                    stepIndicator.textContent = "Done";
+                    timerDisplay.textContent = "00:00";
+                    break;
+            }
+
+            // Update Play/Pause Icon
+            if (isRunning) {
+                playIcon.className = "fa-solid fa-pause";
+                timerDisplay.classList.add('pulse-active');
+            } else {
+                playIcon.className = "fa-solid fa-play ml-1";
+                timerDisplay.classList.remove('pulse-active');
+            }
+        }
+
+        // Main Countdown Tick Logic
+        function tick() {
+            if (timeRemaining > 0) {
+                timeRemaining--;
+            } else {
+                // Interval Complete -> Transition to Next Phase
+                handlePhaseTransition();
+            }
+            updateUI();
+        }
+
+        // Handles transitions between PREP -> WORK -> REST -> WORK...
+        function handlePhaseTransition() {
+            if (currentState === STATE.PREP) {
+                currentState = STATE.WORK;
+                currentExerciseIndex = 0;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            } else if (currentState === STATE.WORK) {
+                if (currentExerciseIndex < WORKOUT_CONFIG.exercises.length - 1) {
+                    currentState = STATE.REST;
+                    timeRemaining = WORKOUT_CONFIG.restDuration;
+                } else {
+                    // Completed last exercise
+                    currentState = STATE.FINISHED;
+                    pauseTimer();
+                }
+            } else if (currentState === STATE.REST) {
+                currentExerciseIndex++;
+                currentState = STATE.WORK;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            }
+        }
+
+        // Timer Control Functions
+        function startTimer() {
+            if (currentState === STATE.FINISHED) return;
+            isRunning = true;
+            requestWakeLock();
+            timerInterval = setInterval(tick, 1000);
+            updateUI();
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            if (timerInterval) clearInterval(timerInterval);
+            releaseWakeLock();
+            updateUI();
+        }
+
+        function togglePlayPause() {
+            if (currentState === STATE.FINISHED) {
+                restartWorkout();
+                return;
+            }
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function skipNext() {
+            if (currentState === STATE.PREP) {
+                currentState = STATE.WORK;
+                currentExerciseIndex = 0;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            } else if (currentState === STATE.WORK) {
+                if (currentExerciseIndex < WORKOUT_CONFIG.exercises.length - 1) {
+                    currentState = STATE.REST;
+                    timeRemaining = WORKOUT_CONFIG.restDuration;
+                } else {
+                    currentState = STATE.FINISHED;
+                    pauseTimer();
+                }
+            } else if (currentState === STATE.REST) {
+                currentExerciseIndex++;
+                currentState = STATE.WORK;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            }
+            updateUI();
+        }
+
+        function skipPrevious() {
+            if (currentState === STATE.PREP) {
+                timeRemaining = WORKOUT_CONFIG.prepDuration;
+            } else if (currentState === STATE.WORK) {
+                // If more than 5 seconds elapsed in work, restart current work interval
+                if (timeRemaining < WORKOUT_CONFIG.workDuration - 5) {
+                    timeRemaining = WORKOUT_CONFIG.workDuration;
+                } else if (currentExerciseIndex > 0) {
+                    // Go back to previous rest
+                    currentExerciseIndex--;
+                    currentState = STATE.REST;
+                    timeRemaining = WORKOUT_CONFIG.restDuration;
+                } else {
+                    // Go back to prep
+                    currentState = STATE.PREP;
+                    timeRemaining = WORKOUT_CONFIG.prepDuration;
+                }
+            } else if (currentState === STATE.REST) {
+                // Go back to work phase of current exercise
+                currentState = STATE.WORK;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            } else if (currentState === STATE.FINISHED) {
+                currentState = STATE.WORK;
+                currentExerciseIndex = WORKOUT_CONFIG.exercises.length - 1;
+                timeRemaining = WORKOUT_CONFIG.workDuration;
+            }
+            updateUI();
+        }
+
+        function restartWorkout() {
+            pauseTimer();
+            currentState = STATE.PREP;
+            currentExerciseIndex = 0;
+            timeRemaining = WORKOUT_CONFIG.prepDuration;
+            updateUI();
+        }
+
+        // Event Listeners
+        btnPlayPause.addEventListener('click', togglePlayPause);
+        btnNext.addEventListener('click', skipNext);
+        btnPrev.addEventListener('click', skipPrevious);
+        btnRestart.addEventListener('click', restartWorkout);
+
+        // Keyboard Shortcut Controls (Space = Play/Pause, Arrows = Skip)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === 'ArrowRight') {
+                skipNext();
+            } else if (e.code === 'ArrowLeft') {
+                skipPrevious();
+            }
+        });
+
+        // Initial Render
+        updateUI();
+    </script>
+</body>
+</html>
