@@ -77,9 +77,10 @@
             <span id="workout-title" class="text-xs sm:text-sm font-bold tracking-wider uppercase opacity-80">
                 Tanja's Workout
             </span>
-            <span id="wake-lock-status" class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full card-bg flex items-center gap-1 opacity-90">
-                <i class="fa-solid fa-lock"></i> Awake
-            </span>
+            <button id="wake-lock-btn" type="button" title="Toggle Screen Awake" class="text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full card-bg border flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer">
+                <i id="wake-lock-icon" class="fa-solid fa-lock"></i>
+                <span id="wake-lock-text">Awake: Auto</span>
+            </button>
         </div>
 
         <!-- Overall Progress Bar Container -->
@@ -123,7 +124,7 @@
 
         <!-- Subtext / Next Up preview when in WORK state -->
         <div id="next-up-container" class="h-6 sm:h-8 text-xs sm:text-lg font-bold opacity-80 tracking-wide mt-1">
-            <span id="next-up-label">Next: </span><span id="next-up-name" class="font-black">Squat and calf raise</span>
+            <span id="next-up-label">Next: </span><span id="next-up-name" class="font-black">Hollow Rock / Bicycle Crunch</span>
         </div>
     </main>
 
@@ -161,19 +162,19 @@
             workDuration: 40,
             restDuration: 20,
             exercises: [
-                "Squat and calf raise",
-                "Reverse lunge",
-                "Lat lunge",
-                "Skater lunge",
-                "Push ups",
-                "Plank shoulder taps",
-                "Tricep dips",
-                "Bear crawl",
-                "Mnt climbers",
-                "Squat knee drive",
-                "Burpee",
-                "Side plank knee to elbow (Left)",
-                "Side plank knee to elbow (Right)"
+                "Hollow Rock / Bicycle Crunch",
+                "Walkout to T",
+                "Dead Bug",
+                "Standing Crunches",
+                "Pushups",
+                "Plank Shoulder Taps",
+                "Tricep Dips",
+                "Bear Crawl",
+                "Mountain Climbers",
+                "Squat Knee Drive",
+                "Army Crawl",
+                "Side Plank Knee to Elbow (Right)",
+                "Side Plank Knee to Elbow (Left)"
             ]
         };
 
@@ -190,6 +191,7 @@
         let isRunning = false;
         let timerInterval = null;
         let wakeLock = null;
+        let wakeLockEnabled = true;
 
         const bodyEl = document.body;
         const statusBadge = document.getElementById('status-badge');
@@ -207,30 +209,84 @@
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
         const btnRestart = document.getElementById('btn-restart');
-        const wakeLockStatus = document.getElementById('wake-lock-status');
+        const wakeLockBtn = document.getElementById('wake-lock-btn');
+        const wakeLockIcon = document.getElementById('wake-lock-icon');
+        const wakeLockText = document.getElementById('wake-lock-text');
+
+        function updateWakeLockUI(isActive) {
+            if (!wakeLockEnabled) {
+                wakeLockIcon.className = "fa-solid fa-lock-open opacity-60";
+                wakeLockText.textContent = "Awake: Off";
+                wakeLockBtn.classList.add('opacity-50');
+            } else if (isActive) {
+                wakeLockIcon.className = "fa-solid fa-lock";
+                wakeLockText.textContent = "Awake: On";
+                wakeLockBtn.classList.remove('opacity-50');
+            } else {
+                wakeLockIcon.className = "fa-solid fa-lock";
+                wakeLockText.textContent = "Awake: Ready";
+                wakeLockBtn.classList.remove('opacity-50');
+            }
+        }
 
         async function requestWakeLock() {
+            if (!wakeLockEnabled) {
+                updateWakeLockUI(false);
+                return;
+            }
             try {
                 if ('wakeLock' in navigator) {
+                    if (wakeLock) return;
                     wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLockStatus.classList.remove('opacity-40');
+                    updateWakeLockUI(true);
+                    wakeLock.addEventListener('release', () => {
+                        wakeLock = null;
+                        updateWakeLockUI(false);
+                    });
                 } else {
                     const video = document.getElementById('wake-lock-video');
-                    if (video) video.play().catch(() => {});
+                    if (video) {
+                        await video.play();
+                        updateWakeLockUI(true);
+                    }
                 }
             } catch (err) {
                 console.log('Wake Lock request failed:', err);
+                updateWakeLockUI(false);
             }
         }
 
-        function releaseWakeLock() {
-            if (wakeLock) {
-                wakeLock.release().then(() => { wakeLock = null; });
+        async function releaseWakeLock() {
+            try {
+                if (wakeLock) {
+                    await wakeLock.release();
+                    wakeLock = null;
+                }
+                const video = document.getElementById('wake-lock-video');
+                if (video && !video.paused) {
+                    video.pause();
+                }
+            } catch (err) {
+                console.log('Wake Lock release failed:', err);
+            }
+            updateWakeLockUI(false);
+        }
+
+        async function toggleWakeLock() {
+            wakeLockEnabled = !wakeLockEnabled;
+            if (wakeLockEnabled) {
+                await requestWakeLock();
+            } else {
+                await releaseWakeLock();
             }
         }
+
+        wakeLockBtn.addEventListener('click', toggleWakeLock);
 
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && isRunning) requestWakeLock();
+            if (document.visibilityState === 'visible' && isRunning && wakeLockEnabled) {
+                requestWakeLock();
+            }
         });
 
         function formatTime(seconds) {
@@ -451,6 +507,7 @@
             else if (e.code === 'ArrowLeft') skipPrevious();
         });
 
+        updateWakeLockUI(false);
         updateUI();
     </script>
 </body>
